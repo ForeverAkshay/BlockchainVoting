@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiGet } from "@/lib/queryClient";
 import { useWeb3 } from "@/lib/web3";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,9 @@ export default function MyElections() {
 
   const { data: elections, isLoading } = useQuery({
     queryKey: [`/api/elections/creator/${address}`],
+    queryFn: async () => {
+      return await apiGet<Election[]>(`/api/elections/creator/${address}`);
+    },
     enabled: isConnected && !!address
   });
 
@@ -130,7 +133,7 @@ export default function MyElections() {
                     <tr key={election.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-800">{election.title}</div>
-                        <div className="text-xs text-gray-500">Created on {format(new Date(election.createdAt), "MMM d, yyyy")}</div>
+                        <div className="text-xs text-gray-500">Created on {election.createdAt ? format(new Date(election.createdAt), "MMM d, yyyy") : "N/A"}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {isActive && (
@@ -215,14 +218,14 @@ export default function MyElections() {
             <h4 className="text-sm font-medium text-gray-500 mb-2">Contract Address</h4>
             <div className="flex items-center">
               <code className="bg-white px-3 py-1 rounded text-sm text-gray-800 border border-gray-200 flex-grow overflow-x-auto">
-                {process.env.VOTING_CONTRACT_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3"}
+                {import.meta.env.VITE_VOTING_CONTRACT_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3"}
               </code>
               <Button 
                 variant="ghost" 
                 size="sm" 
                 className="ml-2 text-primary"
                 onClick={() => {
-                  navigator.clipboard.writeText(process.env.VOTING_CONTRACT_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3");
+                  navigator.clipboard.writeText(import.meta.env.VITE_VOTING_CONTRACT_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3");
                   toast({
                     title: "Copied to clipboard",
                     description: "Contract address copied to clipboard",

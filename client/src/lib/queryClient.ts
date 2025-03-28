@@ -23,6 +23,11 @@ export async function apiRequest(
   return res;
 }
 
+export async function apiGet<T>(url: string): Promise<T> {
+  const res = await apiRequest("GET", url);
+  return await res.json() as T;
+}
+
 type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;

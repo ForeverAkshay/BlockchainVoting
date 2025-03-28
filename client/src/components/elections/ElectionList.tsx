@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Election } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { apiRequest } from "@/lib/queryClient";
+import { apiGet } from "@/lib/queryClient";
 import ResultsModal from "@/components/results/ResultsModal";
 import VotingInterface from "@/components/voting/VotingInterface";
 
@@ -15,20 +15,18 @@ export default function ElectionList() {
   const [isResultsModalOpen, setIsResultsModalOpen] = useState(false);
   
   // Query to get active elections
-  const { data: activeElections, isLoading: isLoadingActive } = useQuery({
+  const { data: activeElections = [], isLoading: isLoadingActive } = useQuery({
     queryKey: ['/api/elections/active'],
     queryFn: async () => {
-      const response = await apiRequest('/api/elections?active=true');
-      return response;
+      return await apiGet<Election[]>('/api/elections?active=true');
     }
   });
   
   // Query to get completed elections
-  const { data: completedElections, isLoading: isLoadingCompleted } = useQuery({
+  const { data: completedElections = [], isLoading: isLoadingCompleted } = useQuery({
     queryKey: ['/api/elections/completed'],
     queryFn: async () => {
-      const response = await apiRequest('/api/elections?active=false');
-      return response;
+      return await apiGet<Election[]>('/api/elections?active=false');
     }
   });
   
@@ -63,7 +61,11 @@ export default function ElectionList() {
   
   // Function to get vote count from options
   const getVoteCount = (election: Election) => {
-    return election.options.reduce((sum, option) => sum + (option.voteCount || 0), 0);
+    return election.options.reduce((sum, option) => {
+      // Use a type assertion to access the optional voteCount property
+      const voteCount = (option as any).voteCount || 0;
+      return sum + voteCount;
+    }, 0);
   };
   
   return (

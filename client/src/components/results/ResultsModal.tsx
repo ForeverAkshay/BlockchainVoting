@@ -43,7 +43,7 @@ export default function ResultsModal({ election, isOpen, onClose }: ResultsModal
           id: option.id || index,
           name: option.name,
           description: option.description,
-          voteCount: option.voteCount || Math.floor(Math.random() * 100), // Simulated vote count
+          voteCount: (option as any).voteCount || Math.floor(Math.random() * 100), // Simulated vote count with type assertion
           percentage: 0 // Will be calculated below
         }));
         

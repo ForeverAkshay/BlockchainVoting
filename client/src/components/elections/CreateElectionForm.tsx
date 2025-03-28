@@ -146,9 +146,11 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
   };
 
   const onSubmit = (data: any) => {
-    // Update form data with current candidate options
+    // Convert string dates to Date objects
     const formData = {
       ...data,
+      startDate: new Date(data.startDate),
+      endDate: new Date(data.endDate),
       options: candidates,
       creatorAddress: address
     };

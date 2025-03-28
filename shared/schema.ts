@@ -71,6 +71,14 @@ export type Vote = typeof votes.$inferSelect;
 export const createElectionSchema = insertElectionSchema.extend({
   title: z.string().min(3).max(100),
   description: z.string().min(10).max(500),
+  startDate: z.union([
+    z.date(),
+    z.string().transform(date => new Date(date))
+  ]),
+  endDate: z.union([
+    z.date(),
+    z.string().transform(date => new Date(date))
+  ]),
   options: z.array(
     z.object({
       id: z.number(),
