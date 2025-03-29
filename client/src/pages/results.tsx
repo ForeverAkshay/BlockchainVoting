@@ -17,7 +17,7 @@ interface CandidateResult {
 }
 
 export default function ResultsPage() {
-  const [, params] = useLocation();
+  const [location] = useLocation();
   const [election, setElection] = useState<Election | null>(null);
   const [results, setResults] = useState<CandidateResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
