@@ -102,6 +102,21 @@ export default function VotingInterface({ election, isOpen, onClose }: VotingInt
       // Get contract with signer to send transactions
       const contract = getVotingContract(signer);
       
+      // First verify with the database that the user hasn't voted already
+      const voteCheckResponse = await apiRequest("GET", `/api/votes/check?electionId=${election.id}&voterAddress=${address}`);
+      const voteCheckData = await voteCheckResponse.json();
+      
+      if (voteCheckData.hasVoted) {
+        setTxStatus("error");
+        toast({
+          title: "Already Voted",
+          description: "You have already voted in this election",
+          variant: "destructive",
+        });
+        setHasVoted(true);
+        return;
+      }
+      
       // Send transaction to vote
       const tx = await contract.vote(election.id, selectedCandidate);
       setTxHash(tx.hash);
@@ -117,7 +132,7 @@ export default function VotingInterface({ election, isOpen, onClose }: VotingInt
         await apiRequest("POST", "/api/votes", {
           electionId: election.id,
           voterAddress: address,
-          candidateId: selectedCandidate,
+          optionId: selectedCandidate, // Changed from candidateId to optionId to match schema
           transactionHash: tx.hash
         });
         
