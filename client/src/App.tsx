@@ -9,6 +9,7 @@ import Welcome from "@/pages/welcome";
 import VoterPage from "@/pages/voter";
 import AdminPage from "@/pages/admin";
 import { Web3Provider } from "./lib/web3";
+import { WebSocketProvider } from "./lib/websocket";
 
 function Router() {
   return (
@@ -27,8 +28,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Web3Provider>
-        <Router />
-        <Toaster />
+        <WebSocketProvider>
+          <Router />
+          <Toaster />
+        </WebSocketProvider>
       </Web3Provider>
     </QueryClientProvider>
   );

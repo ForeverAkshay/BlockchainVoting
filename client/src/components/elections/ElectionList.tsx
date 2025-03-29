@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Election } from "@shared/schema";
@@ -8,11 +8,43 @@ import { Badge } from "@/components/ui/badge";
 import { apiGet } from "@/lib/queryClient";
 import ResultsModal from "@/components/results/ResultsModal";
 import VotingInterface from "@/components/voting/VotingInterface";
+import { useWebSocket } from "@/lib/websocket";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ElectionList() {
   const [selectedElection, setSelectedElection] = useState<Election | null>(null);
   const [isVotingModalOpen, setIsVotingModalOpen] = useState(false);
   const [isResultsModalOpen, setIsResultsModalOpen] = useState(false);
+  const { lastMessage, connected } = useWebSocket();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  // Listen for WebSocket messages and update the UI accordingly
+  useEffect(() => {
+    if (lastMessage) {
+      if (lastMessage.type === 'vote') {
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['/api/elections/active'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/elections/completed'] });
+        
+        // Show toast notification
+        toast({
+          title: "New Vote Recorded",
+          description: `A new vote has been cast for election #${lastMessage.electionId}`,
+        });
+      } else if (lastMessage.type === 'election_created') {
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['/api/elections/active'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/elections/completed'] });
+        
+        // Show toast notification
+        toast({
+          title: "New Election Created",
+          description: lastMessage.message || `Election #${lastMessage.electionId} has been created`,
+        });
+      }
+    }
+  }, [lastMessage, queryClient, toast]);
   
   // Query to get active elections
   const { data: activeElections = [], isLoading: isLoadingActive } = useQuery({

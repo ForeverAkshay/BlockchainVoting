@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import { useWebSocket } from "@/lib/websocket";
 
 export default function Welcome() {
   const [, navigate] = useLocation();
+  const { connected, lastMessage } = useWebSocket();
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -16,10 +19,16 @@ export default function Welcome() {
           <h1 className="text-4xl md:text-5xl font-bold mb-6 text-primary">
             Welcome to BlockVote
           </h1>
-          <p className="text-xl text-gray-600 mb-10">
+          <p className="text-xl text-gray-600 mb-4">
             A secure, transparent voting system built on the blockchain.
             Please select your role to continue.
           </p>
+          <div className="flex items-center justify-center mb-8">
+            <div className={`h-3 w-3 rounded-full mr-2 ${connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="text-sm text-gray-600">
+              {connected ? 'Real-time updates connected' : 'Real-time updates disconnected'}
+            </span>
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl">
             <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 flex flex-col items-center">

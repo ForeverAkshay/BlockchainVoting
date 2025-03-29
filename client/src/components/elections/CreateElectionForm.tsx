@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import TransactionModal from "../modals/TransactionModal";
+import { useWebSocket } from "@/lib/websocket";
 
 interface CreateElectionFormProps {
   onSuccess: () => void;
@@ -38,6 +39,7 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { signer, address } = useWeb3();
+  const { sendMessage } = useWebSocket();
 
   const form = useForm({
     resolver: zodResolver(createElectionSchema),
@@ -148,6 +150,14 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
         status: "active",
         contractAddress: contract.address,
         transactionHash: tx.hash
+      });
+      
+      // Send websocket notification about new election
+      sendMessage({
+        type: 'election_created',
+        electionId: electionData.id,
+        transactionHash: tx.hash,
+        message: `New election "${electionData.title}" created`
       });
       
       queryClient.invalidateQueries({ queryKey: ["/api/elections"] });

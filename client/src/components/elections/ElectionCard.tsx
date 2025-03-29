@@ -24,32 +24,51 @@ export default function ElectionCard({ election, onVoteClick, onResultClick, isA
   // Check if the user has voted
   useEffect(() => {
     const checkVotingStatus = async () => {
-      if (!provider || !address || !election.contractAddress) return;
+      if (!address || !election) return;
       
       try {
-        // Check on-chain voting status
-        const contract = getVotingContract(provider);
-        const voted = await contract.hasVoted(election.id, address);
-        setHasVoted(voted);
-        
-        // Get election data from blockchain
-        const electionData = await contract.getElectionSummary(election.id);
-        setVoterCount(Number(electionData.totalVotes));
-      } catch (error) {
-        console.error("Failed to check voting status:", error);
+        // First check on-chain if contract is deployed
+        if (provider && election.contractAddress) {
+          try {
+            const contract = getVotingContract(provider);
+            const voted = await contract.hasVoted(election.id, address);
+            setHasVoted(voted);
+            
+            // Get election data from blockchain
+            const electionData = await contract.getElectionSummary(election.id);
+            setVoterCount(Number(electionData.totalVotes));
+            
+            // If we got the blockchain data successfully, return early
+            if (voted) {
+              console.log(`User ${address} has already voted for election ${election.id} (verified on blockchain)`);
+              return;
+            }
+          } catch (contractError) {
+            console.error("Failed to check voting status on blockchain:", contractError);
+            // Continue to API check if blockchain check fails
+          }
+        }
         
         // Fallback to API check
         try {
-          const res = await apiRequest("GET", `/api/votes/check?electionId=${election.id}&voterAddress=${address}`, undefined);
+          const res = await apiRequest("GET", `/api/votes/check?electionId=${election.id}&voterAddress=${address}`);
           const data = await res.json();
-          setHasVoted(data.hasVoted);
+          
+          if (data.hasVoted) {
+            console.log(`User ${address} has already voted for election ${election.id} (verified in database)`);
+            setHasVoted(true);
+          }
         } catch (apiError) {
           console.error("Failed to check voting status via API:", apiError);
         }
+      } catch (error) {
+        console.error("Failed to check voting status:", error);
       }
     };
 
-    checkVotingStatus();
+    if (address) {
+      checkVotingStatus();
+    }
   }, [provider, address, election]);
 
   // Format dates for display

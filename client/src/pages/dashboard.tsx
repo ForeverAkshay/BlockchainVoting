@@ -2,12 +2,15 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import DashboardTabs from "@/components/dashboard/DashboardTabs";
 import { useWeb3 } from "@/lib/web3";
+import { useWebSocket } from "@/lib/websocket";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 
 export default function Dashboard() {
   const { isConnected, connect, isConnecting } = useWeb3();
+  const { connected, lastMessage } = useWebSocket();
   const [location, navigate] = useLocation();
 
   // If not connected and not connecting, show connect wallet prompt
@@ -54,6 +57,21 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       <Header />
+      {isConnected && (
+        <div className="container mx-auto px-4 mt-2">
+          <div className="flex items-center">
+            <div className={`h-2 w-2 rounded-full mr-1 ${connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="text-xs text-gray-500">
+              {connected ? 'Real-time updates connected' : 'Real-time updates disconnected'}
+            </span>
+            {lastMessage && (
+              <Badge variant="outline" className="ml-2 text-xs">
+                Last update: {lastMessage.type}
+              </Badge>
+            )}
+          </div>
+        </div>
+      )}
       {renderContent()}
       <Footer />
     </div>

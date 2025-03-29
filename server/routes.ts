@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { createElectionSchema, insertElectionSchema, insertVoteSchema } from "@shared/schema";
 import express from "express";
 import { z } from "zod";
+import { WebSocketServer, WebSocket } from "ws";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes
@@ -80,6 +81,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Election not found" });
       }
       
+      // Broadcast election status update to all connected clients
+      clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+            type: 'election_created',
+            electionId: id,
+            transactionHash: transactionHash,
+            message: `Election "${updatedElection.title}" has been deployed to the blockchain`
+          }));
+        }
+      });
+      
       res.json(updatedElection);
     } catch (error) {
       res.status(500).json({ message: "Failed to update election status" });
@@ -100,32 +113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Votes routes
-  apiRouter.post("/votes", async (req, res) => {
-    try {
-      const validatedData = insertVoteSchema.parse(req.body);
-      
-      // Check if the election exists
-      const election = await storage.getElection(validatedData.electionId);
-      if (!election) {
-        return res.status(404).json({ message: "Election not found" });
-      }
-      
-      // Check if the user has already voted
-      const hasVoted = await storage.hasVoted(validatedData.electionId, validatedData.voterAddress);
-      if (hasVoted) {
-        return res.status(400).json({ message: "You have already voted in this election" });
-      }
-      
-      const vote = await storage.createVote(validatedData);
-      res.status(201).json(vote);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid vote data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to record vote" });
-    }
-  });
+  // Votes routes - This is now handled below with WebSocket integration
   
   apiRouter.get("/votes/election/:id", async (req, res) => {
     try {
@@ -161,5 +149,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", apiRouter);
 
   const httpServer = createServer(app);
+  
+  // Add WebSocket server for real-time updates
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  // Store connected clients
+  const clients = new Set<WebSocket>();
+  
+  wss.on('connection', (ws) => {
+    // Add client to set
+    clients.add(ws);
+    
+    // Send initial message
+    ws.send(JSON.stringify({
+      type: 'connect',
+      message: 'Connected to WebSocket server'
+    }));
+    
+    // Handle client messages
+    ws.on('message', (message) => {
+      console.log('Received message:', message.toString());
+    });
+    
+    // Remove client when disconnected
+    ws.on('close', () => {
+      clients.delete(ws);
+    });
+  });
+  
+  // Modify the vote POST handler to broadcast updates when a vote is cast
+  apiRouter.post("/votes", async (req, res) => {
+    try {
+      const validatedData = insertVoteSchema.parse(req.body);
+      
+      // Check if the election exists
+      const election = await storage.getElection(validatedData.electionId);
+      if (!election) {
+        return res.status(404).json({ message: "Election not found" });
+      }
+      
+      // Check if the user has already voted
+      const hasVoted = await storage.hasVoted(validatedData.electionId, validatedData.voterAddress);
+      if (hasVoted) {
+        return res.status(400).json({ message: "You have already voted in this election" });
+      }
+      
+      const vote = await storage.createVote(validatedData);
+      res.status(201).json(vote);
+      
+      // Broadcast vote update to all connected clients
+      const updateMessage = JSON.stringify({
+        type: 'vote',
+        electionId: validatedData.electionId,
+        transactionHash: validatedData.transactionHash
+      });
+      
+      clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(updateMessage);
+        }
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid vote data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to record vote" });
+    }
+  });
+  
   return httpServer;
 }

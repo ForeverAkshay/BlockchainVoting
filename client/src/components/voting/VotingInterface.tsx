@@ -13,8 +13,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Election } from "@shared/schema";
-import { useWeb3 } from "@/lib/web3";
+import { useWeb3, getVotingContract } from "@/lib/web3";
 import TransactionModal from "@/components/modals/TransactionModal";
+import { apiRequest } from "@/lib/queryClient";
+import { useWebSocket } from "@/lib/websocket";
 
 interface VotingInterfaceProps {
   election: Election;
@@ -24,7 +26,8 @@ interface VotingInterfaceProps {
 
 export default function VotingInterface({ election, isOpen, onClose }: VotingInterfaceProps) {
   const { toast } = useToast();
-  const { signer, address } = useWeb3();
+  const { signer, address, provider } = useWeb3();
+  const { sendMessage } = useWebSocket();
   const [selectedCandidate, setSelectedCandidate] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
@@ -38,16 +41,32 @@ export default function VotingInterface({ election, isOpen, onClose }: VotingInt
     
     const checkVoteStatus = async () => {
       try {
-        // This would be an API or blockchain call in a real implementation
-        // For now, we'll simulate that the user hasn't voted
-        setHasVoted(false);
+        // Check on the blockchain first
+        if (election.contractAddress && provider) {
+          const contract = getVotingContract(provider);
+          const voted = await contract.hasVoted(election.id, address);
+          if (voted) {
+            setHasVoted(true);
+            return;
+          }
+        }
+        
+        // Then check in our database
+        const response = await apiRequest("GET", `/api/votes/check?electionId=${election.id}&voterAddress=${address}`);
+        const data = await response.json();
+        setHasVoted(data.hasVoted);
       } catch (error) {
         console.error("Failed to check vote status:", error);
+        toast({
+          title: "Error",
+          description: "Failed to check if you have already voted in this election.",
+          variant: "destructive",
+        });
       }
     };
     
     checkVoteStatus();
-  }, [isOpen, address, election]);
+  }, [isOpen, address, election, provider, toast]);
   
   const handleSubmitVote = async () => {
     if (!selectedCandidate && selectedCandidate !== 0) {
@@ -59,30 +78,76 @@ export default function VotingInterface({ election, isOpen, onClose }: VotingInt
       return;
     }
     
+    if (!signer || !address) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to vote",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!election.contractAddress) {
+      toast({
+        title: "Contract Not Deployed",
+        description: "This election is not yet deployed on the blockchain",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     setTxModalOpen(true);
     setTxStatus("pending");
     
     try {
-      // Simulate blockchain transaction timing
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Get contract with signer to send transactions
+      const contract = getVotingContract(signer);
       
-      // Simulate successful vote
-      setTxStatus("success");
-      setTxHash("0x" + Math.random().toString(16).substring(2, 42));
-      setHasVoted(true);
+      // Send transaction to vote
+      const tx = await contract.vote(election.id, selectedCandidate);
+      setTxHash(tx.hash);
       
-      toast({
-        title: "Vote Submitted",
-        description: "Your vote has been recorded successfully!",
-      });
+      // Wait for transaction to be mined
+      const receipt = await tx.wait();
+      
+      if (receipt.status === 1) {
+        // Transaction successful
+        setTxStatus("success");
+        
+        // Record vote in the database
+        await apiRequest("POST", "/api/votes", {
+          electionId: election.id,
+          voterAddress: address,
+          candidateId: selectedCandidate,
+          transactionHash: tx.hash
+        });
+        
+        // Send WebSocket notification about the vote
+        sendMessage({
+          type: 'vote',
+          electionId: election.id,
+          candidateId: selectedCandidate,
+          transactionHash: tx.hash,
+          message: `Vote cast for candidate "${election.options[selectedCandidate].name}" in election "${election.title}"`
+        });
+        
+        setHasVoted(true);
+        
+        toast({
+          title: "Vote Submitted",
+          description: "Your vote has been recorded successfully on the blockchain!",
+        });
+      } else {
+        throw new Error("Transaction failed");
+      }
     } catch (error) {
       console.error("Failed to submit vote:", error);
       setTxStatus("error");
       
       toast({
         title: "Vote Failed",
-        description: "Failed to record your vote. Please try again.",
+        description: "Failed to record your vote on the blockchain. Please try again.",
         variant: "destructive",
       });
     } finally {
