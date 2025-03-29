@@ -38,18 +38,37 @@ export default function ResultsModal({ election, isOpen, onClose }: ResultsModal
       setIsLoading(true);
       
       try {
-        // Simulated results for demonstration purposes
-        const simulatedResults = election.options.map((option, index) => ({
+        // Fetch real votes from the API
+        const response = await fetch(`/api/votes/election/${election.id}`);
+        const votes = await response.json();
+        
+        // Count votes for each option
+        const voteCounts = new Map<number, number>();
+        
+        // Initialize all options with 0 votes
+        election.options.forEach((option) => {
+          voteCounts.set(option.id, 0);
+        });
+        
+        // Count actual votes
+        votes.forEach((vote: any) => {
+          const optionId = vote.optionId;
+          const currentCount = voteCounts.get(optionId) || 0;
+          voteCounts.set(optionId, currentCount + 1);
+        });
+        
+        // Create results with actual vote counts
+        const realResults = election.options.map((option, index) => ({
           id: option.id || index,
           name: option.name,
           description: option.description,
-          voteCount: (option as any).voteCount || Math.floor(Math.random() * 100), // Simulated vote count with type assertion
+          voteCount: voteCounts.get(option.id) || 0,
           percentage: 0 // Will be calculated below
         }));
         
         // Calculate percentages
-        const totalVotes = simulatedResults.reduce((sum: number, candidate: CandidateResult) => sum + candidate.voteCount, 0);
-        const resultsWithPercentages = simulatedResults.map((result: CandidateResult) => ({
+        const totalVotes = realResults.reduce((sum: number, candidate: CandidateResult) => sum + candidate.voteCount, 0);
+        const resultsWithPercentages = realResults.map((result: CandidateResult) => ({
           ...result,
           percentage: totalVotes > 0 ? (result.voteCount / totalVotes) * 100 : 0
         }));
@@ -57,9 +76,10 @@ export default function ResultsModal({ election, isOpen, onClose }: ResultsModal
         // Sort by vote count (descending)
         const sortedResults = resultsWithPercentages.sort((a: CandidateResult, b: CandidateResult) => b.voteCount - a.voteCount);
         
-        // Add visual enhancements for the winner
+        // Add visual enhancements for the winner if there are votes
         const enhancedResults = sortedResults.map((result: CandidateResult) => {
-          const isWinner = totalVotes > 0 && result.voteCount === Math.max(...resultsWithPercentages.map((r: CandidateResult) => r.voteCount));
+          const isWinner = totalVotes > 0 && result.voteCount > 0 && 
+                          result.voteCount === Math.max(...resultsWithPercentages.map((r: CandidateResult) => r.voteCount));
           return {
             ...result,
             isWinner

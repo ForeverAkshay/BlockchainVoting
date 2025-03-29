@@ -91,6 +91,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Add DELETE endpoint for elections
+  apiRouter.delete("/elections/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid election ID" });
+      }
+      
+      // Check if the election exists
+      const election = await storage.getElection(id);
+      if (!election) {
+        return res.status(404).json({ message: "Election not found" });
+      }
+      
+      // Check if the election is active or completed
+      const now = new Date();
+      const startDate = new Date(election.startDate);
+      const endDate = new Date(election.endDate);
+      
+      if (startDate <= now && endDate >= now) {
+        return res.status(400).json({ message: "Cannot delete an active election" });
+      }
+      
+      if (endDate < now) {
+        return res.status(400).json({ message: "Cannot delete a completed election" });
+      }
+      
+      // Delete the election
+      const deleted = await storage.deleteElection(id);
+      if (!deleted) {
+        return res.status(500).json({ message: "Failed to delete election" });
+      }
+      
+      // Return success
+      res.status(200).json({ success: true, message: "Election deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting election:", error);
+      res.status(500).json({ message: "Failed to delete election" });
+    }
+  });
+
   apiRouter.put("/elections/:id/status", async (req, res) => {
     try {
       const id = parseInt(req.params.id);

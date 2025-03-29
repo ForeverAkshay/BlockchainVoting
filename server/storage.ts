@@ -23,6 +23,7 @@ export interface IStorage {
     contractAddress?: string, 
     transactionHash?: string
   ): Promise<Election | undefined>;
+  deleteElection(id: number): Promise<boolean>;
   
   // Vote methods
   createVote(vote: InsertVote): Promise<Vote>;
@@ -143,6 +144,25 @@ export class MemStorage implements IStorage {
     };
     this.elections.set(id, updatedElection);
     return updatedElection;
+  }
+  
+  async deleteElection(id: number): Promise<boolean> {
+    // Check if the election exists
+    const exists = this.elections.has(id);
+    if (!exists) return false;
+    
+    // Delete the election
+    const deleted = this.elections.delete(id);
+    
+    // Also delete any votes associated with this election
+    const votesToDelete = Array.from(this.votes.entries())
+      .filter(([_, vote]) => vote.electionId === id);
+      
+    for (const [voteId] of votesToDelete) {
+      this.votes.delete(voteId);
+    }
+    
+    return deleted;
   }
 
   // Vote methods
