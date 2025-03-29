@@ -95,10 +95,17 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       
       return await response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       console.log("Election created in database:", data);
-      queryClient.invalidateQueries({ queryKey: ["/api/elections"] });
-      createBlockchainElection(data);
+      try {
+        await createBlockchainElection(data);
+      } catch (error) {
+        console.error("Error in blockchain election creation:", error);
+        // Ensure mutation is reset even if blockchain fails
+        createElectionMutation.reset();
+      } finally {
+        queryClient.invalidateQueries({ queryKey: ["/api/elections"] });
+      }
     },
     onError: (error: any) => {
       console.error("Failed to create election:", error);
@@ -200,8 +207,9 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
         return;
       }
       
-      // Create the election on the blockchain with explicit gas limit to avoid issues
-      const tx = await contract.createElection(
+      // Add a timeout for the transaction to prevent hanging
+      let timeoutId: any = null;
+      const transactionPromise = contract.createElection(
         electionData.title,
         electionData.description,
         startTime,
@@ -211,6 +219,19 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
         candidateDescriptions,
         { gasLimit: 3000000 } // Set a higher gas limit to ensure transaction goes through
       );
+      
+      // Set a 60-second timeout to abort if transaction is taking too long
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error("Transaction timed out. Please try again."));
+        }, 60000); // 60 seconds
+      });
+      
+      // Race between the transaction and timeout
+      const tx = await Promise.race([transactionPromise, timeoutPromise]) as any;
+      
+      // Clear timeout if transaction completed
+      if (timeoutId) clearTimeout(timeoutId);
       
       setTxHash(tx.hash);
       
@@ -591,11 +612,28 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
         onClose={() => {
           if (txStatus !== "pending") {
             setShowTxModal(false);
+            setTxHash("");
+            createElectionMutation.reset();
+          } else {
+            // If it's pending for more than 60 seconds, allow user to close
+            toast({
+              title: "Transaction may be delayed",
+              description: "The transaction might continue in the background. You can check your wallet for updates.",
+              duration: 5000,
+            });
+            setShowTxModal(false);
+            setTxStatus("error");
+            createElectionMutation.reset();
           }
         }}
         status={txStatus}
         txHash={txHash}
-        onRetry={() => createElectionMutation.mutate(form.getValues())}
+        onRetry={() => {
+          createElectionMutation.reset();
+          setTimeout(() => {
+            createElectionMutation.mutate(form.getValues());
+          }, 100);
+        }}
       />
     </>
   );

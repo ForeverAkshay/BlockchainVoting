@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,31 @@ export default function TransactionModal({
   txHash, 
   onRetry 
 }: TransactionModalProps) {
+  const [pendingTime, setPendingTime] = useState(0);
+  const [allowForceClose, setAllowForceClose] = useState(false);
+  
+  // Reset counter when modal opens/closes or status changes
+  useEffect(() => {
+    if (isOpen && status === "pending") {
+      setPendingTime(0);
+      setAllowForceClose(false);
+      
+      // Start timer
+      const timer = setInterval(() => {
+        setPendingTime(prev => {
+          const newTime = prev + 1;
+          if (newTime >= 30) { // After 30 seconds, allow force close
+            setAllowForceClose(true);
+            clearInterval(timer);
+          }
+          return newTime;
+        });
+      }, 1000);
+      
+      return () => clearInterval(timer);
+    }
+  }, [isOpen, status]);
+  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
@@ -44,6 +70,12 @@ export default function TransactionModal({
               <p className="text-sm text-gray-500 text-center">
                 Your transaction is being processed on the blockchain. This may take a few moments.
               </p>
+              {pendingTime > 0 && (
+                <p className="text-xs text-gray-400 mt-2">
+                  Waiting for {pendingTime} seconds...
+                  {allowForceClose && " You can close this and check transaction status in your wallet."}
+                </p>
+              )}
             </div>
           )}
           
@@ -91,12 +123,23 @@ export default function TransactionModal({
               Retry Transaction
             </Button>
           )}
+          {status === "pending" && allowForceClose && (
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                onClose();
+              }} 
+              className="w-full"
+            >
+              Cancel Transaction
+            </Button>
+          )}
           <Button 
-            variant={status === "error" ? "outline" : "default"} 
+            variant={status === "error" || (status === "pending" && allowForceClose) ? "outline" : "default"} 
             onClick={onClose} 
             className="w-full"
           >
-            {status === "pending" ? "Close (Still Processing)" : "Close"}
+            {status === "pending" && !allowForceClose ? "Close (Still Processing)" : "Close"}
           </Button>
         </DialogFooter>
       </DialogContent>
