@@ -82,10 +82,19 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       console.log("Mutation function called with data:", data);
       
       try {
+        // Log all data for debugging
+        console.log("Submitting to API with data:", JSON.stringify(data));
+        
         // First create the election in the database
-        const apiResponse = await apiRequest("POST", "/api/elections", {
-          ...data,
-          creatorAddress: address
+        const apiResponse = await fetch("/api/elections", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            ...data,
+            creatorAddress: address
+          })
         });
         
         // Check if the response is ok
@@ -208,6 +217,17 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
         return;
       }
       
+      // Make sure the data is complete
+      if (!data.title || !data.description || !data.startDate || !data.startTime || !data.endTime) {
+        toast({
+          title: "Missing information",
+          description: "Please fill out all required fields",
+          variant: "destructive"
+        });
+        console.error("Missing required fields:", { data });
+        return;
+      }
+      
       // Log form data for debugging
       console.log("Form submission data:", data);
       console.log("Candidates state:", candidates);
@@ -215,6 +235,16 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       // Create start and end DateTimes using the same date but different times
       const startDateTime = combineDateTime(data.startDate, data.startTime);
       const endDateTime = combineDateTime(data.startDate, data.endTime);
+      
+      // Validation: Check if date/time combination produced valid results
+      if (startDateTime === 0 || endDateTime === 0) {
+        toast({
+          title: "Invalid date/time format",
+          description: "Please ensure all date and time fields are filled correctly",
+          variant: "destructive"
+        });
+        return;
+      }
       
       // Validation: Check if times are valid
       const now = Math.floor(Date.now() / 1000);
@@ -241,15 +271,17 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       const endDate = new Date(endDateTime * 1000).toISOString();
       
       const formData = {
-        ...data,
+        title: data.title,
+        description: data.description,
         startDate,
         endDate,
+        isPublic: data.isPublic,
         options: candidates.map(c => ({
           id: c.id,
           name: c.name.trim(),
           description: c.description.trim() || ""
         })),
-        creatorAddress: address
+        creatorAddress: address || ""
       };
       
       console.log("Prepared submission data:", formData);
