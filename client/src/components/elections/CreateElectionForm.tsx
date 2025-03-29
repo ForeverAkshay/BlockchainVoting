@@ -56,7 +56,6 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       title: "",
       description: "",
       startDate: new Date().toISOString().split("T")[0],
-      endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
       startTime: "09:00",
       endTime: "17:00",
       isPublic: true,
@@ -212,9 +211,9 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       console.log("Form submission data:", data);
       console.log("Candidates state:", candidates);
       
-      // Combine date and time into DateTime objects
+      // Create start and end DateTimes using the same date but different times
       const startDateTime = combineDateTime(data.startDate, data.startTime);
-      const endDateTime = combineDateTime(data.endDate, data.endTime);
+      const endDateTime = combineDateTime(data.startDate, data.endTime);
       
       const formData = {
         ...data,
@@ -300,13 +299,13 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
             />
             
             <div className="grid grid-cols-1 gap-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="startDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Start Date</FormLabel>
+                      <FormLabel>Election Date</FormLabel>
                       <FormControl>
                         <Input type="date" {...field} />
                       </FormControl>
@@ -322,22 +321,6 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
                       <FormLabel>Start Time</FormLabel>
                       <FormControl>
                         <Input type="time" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="endDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>End Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
