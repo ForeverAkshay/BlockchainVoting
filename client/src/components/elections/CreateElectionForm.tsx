@@ -17,6 +17,15 @@ import { Label } from "@/components/ui/label";
 import TransactionModal from "../modals/TransactionModal";
 import { useWebSocket } from "@/lib/websocket";
 
+// Utility function to combine date and time strings into a Date object
+const combineDateTime = (dateStr: string, timeStr: string): Date => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  
+  // Month is 0-indexed in JavaScript Date
+  return new Date(year, month - 1, day, hours, minutes);
+};
+
 interface CreateElectionFormProps {
   onSuccess: () => void;
 }
@@ -48,6 +57,8 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       description: "",
       startDate: new Date().toISOString().split("T")[0],
       endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      startTime: "09:00",
+      endTime: "17:00",
       isPublic: true,
       options: candidates,
       creatorAddress: address || ""
@@ -124,8 +135,8 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       const contract = getVotingContract(signer);
       
       // Prepare data for the contract
-      const startTime = Math.floor(new Date(electionData.startDate).getTime() / 1000);
-      const endTime = Math.floor(new Date(electionData.endDate).getTime() / 1000);
+      const startTime = Math.floor(electionData.startDate.getTime() / 1000);
+      const endTime = Math.floor(electionData.endDate.getTime() / 1000);
       const candidateNames = electionData.options.map((option: any) => option.name);
       const candidateDescriptions = electionData.options.map((option: any) => option.description || "");
       
@@ -201,11 +212,14 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       console.log("Form submission data:", data);
       console.log("Candidates state:", candidates);
       
-      // Convert string dates to Date objects
+      // Combine date and time into DateTime objects
+      const startDateTime = combineDateTime(data.startDate, data.startTime);
+      const endDateTime = combineDateTime(data.endDate, data.endTime);
+      
       const formData = {
         ...data,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
+        startDate: startDateTime,
+        endDate: endDateTime,
         options: candidates.map(c => ({
           id: c.id,
           name: c.name.trim(),
@@ -285,33 +299,64 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
               )}
             />
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="startDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Start Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="endDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>End Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
             
             <FormField
