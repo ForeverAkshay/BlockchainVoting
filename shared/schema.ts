@@ -75,6 +75,10 @@ export const createElectionSchema = insertElectionSchema.extend({
     z.date(),
     z.string().transform(date => new Date(date))
   ]),
+  endDate: z.union([
+    z.date(),
+    z.string().transform(date => new Date(date))
+  ]),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
   options: z.array(

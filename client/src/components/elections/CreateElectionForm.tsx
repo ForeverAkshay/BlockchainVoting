@@ -119,6 +119,16 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       const candidateNames = electionData.options.map((option: any) => option.name);
       const candidateDescriptions = electionData.options.map((option: any) => option.description || "");
       
+      console.log("Creating blockchain election with data:", {
+        title: electionData.title,
+        description: electionData.description,
+        startTime,
+        endTime,
+        isPublic: electionData.isPublic,
+        candidateNames,
+        candidateDescriptions
+      });
+      
       // Create the election on the blockchain
       const tx = await contract.createElection(
         electionData.title,

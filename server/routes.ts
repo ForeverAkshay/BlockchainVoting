@@ -43,6 +43,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Elections POST request body:", req.body);
       
+      // Check if required fields are present
+      if (!req.body.title || !req.body.description || !req.body.startDate || !req.body.endDate || !req.body.options || !req.body.creatorAddress) {
+        console.error("Missing required fields:", {
+          title: !!req.body.title,
+          description: !!req.body.description,
+          startDate: !!req.body.startDate,
+          endDate: !!req.body.endDate,
+          options: !!req.body.options,
+          creatorAddress: !!req.body.creatorAddress
+        });
+        return res.status(400).json({ message: "Missing required fields for election creation" });
+      }
+      
+      // Make sure options is properly formatted
+      if (!Array.isArray(req.body.options) || req.body.options.length < 2) {
+        return res.status(400).json({ message: "At least two options are required" });
+      }
+      
       // Convert date strings to Date objects before validation
       const dataWithParsedDates = {
         ...req.body,
@@ -50,8 +68,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         endDate: new Date(req.body.endDate)
       };
       
+      // Explicitly include creatorAddress and options which are required
+      const validationData = {
+        ...dataWithParsedDates,
+        creatorAddress: req.body.creatorAddress,
+        options: req.body.options
+      };
+      
       // Use createElectionSchema which has proper date transformation
-      const validatedData = createElectionSchema.parse(dataWithParsedDates);
+      const validatedData = createElectionSchema.parse(validationData);
       console.log("Elections POST validated data:", validatedData);
       
       // Create the election with the validated data
