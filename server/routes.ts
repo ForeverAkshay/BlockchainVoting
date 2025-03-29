@@ -42,8 +42,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   apiRouter.post("/elections", async (req, res) => {
     try {
       console.log("Elections POST request body:", req.body);
+      
+      // Convert date strings to Date objects before validation
+      const dataWithParsedDates = {
+        ...req.body,
+        startDate: new Date(req.body.startDate),
+        endDate: new Date(req.body.endDate)
+      };
+      
       // Use createElectionSchema which has proper date transformation
-      const validatedData = createElectionSchema.parse(req.body);
+      const validatedData = createElectionSchema.parse(dataWithParsedDates);
       console.log("Elections POST validated data:", validatedData);
       
       // Create the election with the validated data
