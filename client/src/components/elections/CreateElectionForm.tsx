@@ -148,7 +148,14 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
 
       const contract = getVotingContract(signer);
       
-      // Get timestamps for blockchain
+      // Get timestamps for blockchain (ensure we're using proper millisecond timestamps)
+      console.log("Date validation for blockchain:", {
+        startDateRaw: electionData.startDate,
+        endDateRaw: electionData.endDate,
+        startDateParsed: new Date(electionData.startDate).toString(),
+        endDateParsed: new Date(electionData.endDate).toString()
+      });
+      
       const startTime = Math.floor(new Date(electionData.startDate).getTime() / 1000);
       const endTime = Math.floor(new Date(electionData.endDate).getTime() / 1000);
       const candidateNames = electionData.options.map((option: any) => option.name);
@@ -325,7 +332,19 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       
       // Validation
       const now = new Date();
-      if (startDate <= now) {
+      
+      // Add a small buffer (2 seconds) to account for time taken to fill the form
+      const bufferedNow = new Date(now.getTime() + 2000);
+      
+      console.log("Time validation:", {
+        startDateStr: startDate.toString(),
+        nowStr: now.toString(),
+        startTime: startDate.getTime(),
+        nowTime: now.getTime(),
+        isStartInFuture: startDate.getTime() > now.getTime()
+      });
+      
+      if (startDate.getTime() <= bufferedNow.getTime()) {
         toast({
           title: "Invalid start time",
           description: "Start time must be in the future",
