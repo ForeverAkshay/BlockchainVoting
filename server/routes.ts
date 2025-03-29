@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertElectionSchema, insertVoteSchema } from "@shared/schema";
+import { createElectionSchema, insertElectionSchema, insertVoteSchema } from "@shared/schema";
 import express from "express";
 import { z } from "zod";
 
@@ -40,10 +40,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   apiRouter.post("/elections", async (req, res) => {
     try {
-      const validatedData = insertElectionSchema.parse(req.body);
+      console.log("Elections POST request body:", req.body);
+      // Use createElectionSchema which has proper date transformation
+      const validatedData = createElectionSchema.parse(req.body);
+      console.log("Elections POST validated data:", validatedData);
+      
+      // Create the election with the validated data
       const election = await storage.createElection(validatedData);
       res.status(201).json(election);
     } catch (error) {
+      console.error("Election creation error:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid election data", errors: error.errors });
       }
