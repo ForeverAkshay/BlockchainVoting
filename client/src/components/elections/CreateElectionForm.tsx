@@ -138,7 +138,7 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       // Update the election status in the database
       await apiRequest("PUT", `/api/elections/${electionData.id}/status`, {
         status: "active",
-        contractAddress: contract.address,
+        contractAddress: import.meta.env.VITE_VOTING_CONTRACT_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3",
         transactionHash: tx.hash
       });
       

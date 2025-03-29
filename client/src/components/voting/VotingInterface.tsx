@@ -42,12 +42,17 @@ export default function VotingInterface({ election, isOpen, onClose }: VotingInt
     const checkVoteStatus = async () => {
       try {
         // Check on the blockchain first
-        if (election.contractAddress && provider) {
-          const contract = getVotingContract(provider);
-          const voted = await contract.hasVoted(election.id, address);
-          if (voted) {
-            setHasVoted(true);
-            return;
+        if (provider) {
+          try {
+            const contract = getVotingContract(provider);
+            const voted = await contract.hasVoted(election.id, address);
+            if (voted) {
+              setHasVoted(true);
+              return;
+            }
+          } catch (e) {
+            console.error("Failed to check vote status on blockchain:", e);
+            // Continue to check database if blockchain check fails
           }
         }
         
@@ -87,14 +92,7 @@ export default function VotingInterface({ election, isOpen, onClose }: VotingInt
       return;
     }
     
-    if (!election.contractAddress) {
-      toast({
-        title: "Contract Not Deployed",
-        description: "This election is not yet deployed on the blockchain",
-        variant: "destructive",
-      });
-      return;
-    }
+    // We'll proceed even without contractAddress since we're using the global contract address from environment variables
     
     setIsSubmitting(true);
     setTxModalOpen(true);
