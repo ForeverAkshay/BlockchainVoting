@@ -67,7 +67,7 @@ export default function Welcome() {
               </p>
               <Button 
                 onClick={() => navigate("/admin")}
-                className="bg-accent text-white hover:bg-accent/90 w-full"
+                className="bg-primary text-white hover:bg-primary/90 w-full"
               >
                 Continue as Admin
               </Button>
