@@ -51,7 +51,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         if (data.type === 'vote') {
           toast({
             title: 'New Vote',
-            description: `A new vote has been recorded for election #${data.electionId}`,
+            description: data.message || `A new vote has been recorded for election #${data.electionId}`,
             duration: 3000,
           });
         } else if (data.type === 'election_created') {
@@ -59,6 +59,20 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             title: 'New Election',
             description: data.message || 'A new election has been created',
             duration: 3000,
+          });
+        } else if (data.type === 'election_error') {
+          toast({
+            title: 'Election Error',
+            description: data.message || 'There was an error with an election',
+            variant: 'destructive',
+            duration: 5000,
+          });
+        } else if (data.type === 'transaction_error') {
+          toast({
+            title: 'Transaction Failed',
+            description: data.message || 'There was an error with a blockchain transaction',
+            variant: 'destructive',
+            duration: 5000,
           });
         }
       } catch (error) {

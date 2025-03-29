@@ -163,7 +163,44 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
         description: "Please check your MetaMask wallet and confirm the transaction",
       });
       
-      // Create the election on the blockchain
+      // First attempt to estimate gas to catch errors early
+      try {
+        await contract.createElection.estimateGas(
+          electionData.title,
+          electionData.description,
+          startTime,
+          endTime,
+          electionData.isPublic,
+          candidateNames,
+          candidateDescriptions
+        );
+      } catch (estimateError: any) {
+        console.error("Gas estimation failed:", estimateError);
+        setTxStatus("error");
+        
+        // Handle common contract errors
+        let errorMessage = "Smart contract transaction would fail - try again later or with different parameters";
+        if (estimateError.reason) {
+          errorMessage = `Contract error: ${estimateError.reason}`;
+        }
+        
+        toast({
+          title: "Transaction would fail",
+          description: errorMessage,
+          variant: "destructive"
+        });
+        
+        // Delete the created election from the database since blockchain deployment failed
+        try {
+          await apiRequest("DELETE", `/api/elections/${electionData.id}`, undefined);
+        } catch (deleteError) {
+          console.error("Failed to delete election after failed blockchain transaction:", deleteError);
+        }
+        
+        return;
+      }
+      
+      // Create the election on the blockchain with explicit gas limit to avoid issues
       const tx = await contract.createElection(
         electionData.title,
         electionData.description,
@@ -171,7 +208,8 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
         endTime,
         electionData.isPublic,
         candidateNames,
-        candidateDescriptions
+        candidateDescriptions,
+        { gasLimit: 3000000 } // Set a higher gas limit to ensure transaction goes through
       );
       
       setTxHash(tx.hash);
@@ -218,6 +256,8 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
         errorMessage = "Transaction was rejected by the user";
       } else if (error.code === 4100) {
         errorMessage = "The requested account has not been authorized";
+      } else if (error.code === "CALL_EXCEPTION") {
+        errorMessage = "Transaction failed - the smart contract rejected the operation";
       } else if (error.error?.message) {
         errorMessage = error.error.message;
       } else if (error.message) {
@@ -229,6 +269,13 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
         description: errorMessage,
         variant: "destructive"
       });
+      
+      // Delete the created election from the database since blockchain deployment failed
+      try {
+        await apiRequest("DELETE", `/api/elections/${electionData.id}`, undefined);
+      } catch (deleteError) {
+        console.error("Failed to delete election after failed blockchain transaction:", deleteError);
+      }
     }
   };
 
