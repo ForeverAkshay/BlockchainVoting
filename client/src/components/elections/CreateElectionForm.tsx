@@ -66,6 +66,19 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
     mutationFn: async (data: any) => {
       console.log("Creating election with data:", data);
       
+      // Validate required fields
+      const missingFields = [];
+      if (!data.title) missingFields.push("title");
+      if (!data.description) missingFields.push("description");
+      if (!data.startDate) missingFields.push("start date");
+      if (!data.endDate) missingFields.push("end date");
+      if (!data.options || data.options.length < 2) missingFields.push("candidates (at least 2)");
+      if (!data.creatorAddress) missingFields.push("wallet address");
+      
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
+      }
+      
       // First create the election in the database
       const response = await fetch("/api/elections", {
         method: "POST",
@@ -111,6 +124,21 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       setShowTxModal(true);
       setTxStatus("pending");
 
+      // Check if wallet is properly connected and authorized
+      try {
+        // Request account access if needed
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+      } catch (error) {
+        console.error("User denied account access:", error);
+        setTxStatus("error");
+        toast({
+          title: "Wallet authorization failed",
+          description: "Please connect and authorize your wallet to create an election",
+          variant: "destructive"
+        });
+        return;
+      }
+
       const contract = getVotingContract(signer);
       
       // Get timestamps for blockchain
@@ -127,6 +155,12 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
         isPublic: electionData.isPublic,
         candidateNames,
         candidateDescriptions
+      });
+      
+      // Ask the user to confirm by showing clear instructions
+      toast({
+        title: "Confirm transaction in MetaMask",
+        description: "Please check your MetaMask wallet and confirm the transaction",
       });
       
       // Create the election on the blockchain
@@ -173,13 +207,26 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       
       // Call the success callback
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create election on blockchain:", error);
       setTxStatus("error");
       
+      // Extract the specific error message for user feedback
+      let errorMessage = "Failed to create election on the blockchain";
+      
+      if (error.code === 4001) {
+        errorMessage = "Transaction was rejected by the user";
+      } else if (error.code === 4100) {
+        errorMessage = "The requested account has not been authorized";
+      } else if (error.error?.message) {
+        errorMessage = error.error.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Transaction failed",
-        description: "Failed to create election on the blockchain",
+        description: errorMessage,
         variant: "destructive"
       });
     }

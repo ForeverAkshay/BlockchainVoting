@@ -43,9 +43,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Elections POST request body:", req.body);
       
+      // Check for secondary form submission with date/time fields (ignore these)
+      if (req.body.date && req.body.startTime && req.body.endTime && !req.body.options) {
+        console.log("Missing required fields:", {
+          title: !!req.body.title,
+          description: !!req.body.description,
+          startDate: !!req.body.startDate,
+          endDate: !!req.body.endDate,
+          options: !!req.body.options,
+          creatorAddress: !!req.body.creatorAddress
+        });
+        return res.status(400).json({ message: "Missing required fields for election creation" });
+      }
+      
       // Check if required fields are present
       if (!req.body.title || !req.body.description || !req.body.startDate || !req.body.endDate || !req.body.options || !req.body.creatorAddress) {
-        console.error("Missing required fields:", {
+        console.log("Missing required fields:", {
           title: !!req.body.title,
           description: !!req.body.description,
           startDate: !!req.body.startDate,
