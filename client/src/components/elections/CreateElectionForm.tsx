@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createElectionSchema } from "@shared/schema";
@@ -51,25 +51,55 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       creatorAddress: address || ""
     }
   });
+  
+  // Update the form when candidates or address changes
+  useEffect(() => {
+    form.setValue('options', candidates);
+  }, [candidates, form]);
+  
+  // Update wallet address when it changes
+  useEffect(() => {
+    if (address) {
+      form.setValue('creatorAddress', address);
+    }
+  }, [address, form]);
 
   const createElectionMutation = useMutation({
     mutationFn: async (data: any) => {
-      // First create the election in the database
-      const apiResponse = await apiRequest("POST", "/api/elections", {
-        ...data,
-        creatorAddress: address
-      });
+      console.log("Mutation function called with data:", data);
       
-      return await apiResponse.json();
+      try {
+        // First create the election in the database
+        const apiResponse = await apiRequest("POST", "/api/elections", {
+          ...data,
+          creatorAddress: address
+        });
+        
+        // Check if the response is ok
+        if (!apiResponse.ok) {
+          const errorData = await apiResponse.json();
+          console.error("API error response:", errorData);
+          throw new Error(errorData.message || "Failed to create election");
+        }
+        
+        const responseData = await apiResponse.json();
+        console.log("API response:", responseData);
+        return responseData;
+      } catch (error) {
+        console.error("Mutation error:", error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
+      console.log("Mutation success, data:", data);
       queryClient.invalidateQueries({ queryKey: ["/api/elections"] });
       createBlockchainElection(data);
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error("Mutation error handler:", error);
       toast({
         title: "Failed to create election",
-        description: error.message || "Something went wrong",
+        description: error.message || "Something went wrong with the request",
         variant: "destructive"
       });
     }
@@ -146,16 +176,46 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
   };
 
   const onSubmit = (data: any) => {
-    // Convert string dates to Date objects
-    const formData = {
-      ...data,
-      startDate: new Date(data.startDate),
-      endDate: new Date(data.endDate),
-      options: candidates,
-      creatorAddress: address
-    };
-    
-    createElectionMutation.mutate(formData);
+    try {
+      // Validate form data
+      if (candidates.some(c => !c.name.trim())) {
+        toast({
+          title: "Invalid option names",
+          description: "All candidates/options must have a name",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Log form data for debugging
+      console.log("Form submission data:", data);
+      console.log("Candidates state:", candidates);
+      
+      // Convert string dates to Date objects
+      const formData = {
+        ...data,
+        startDate: new Date(data.startDate),
+        endDate: new Date(data.endDate),
+        options: candidates.map(c => ({
+          id: c.id,
+          name: c.name.trim(),
+          description: c.description.trim() || ""
+        })),
+        creatorAddress: address
+      };
+      
+      console.log("Prepared submission data:", formData);
+      
+      // Submit the data
+      createElectionMutation.mutate(formData);
+    } catch (error) {
+      console.error("Form submission error:", error);
+      toast({
+        title: "Form submission error",
+        description: "Please check the form fields and try again",
+        variant: "destructive"
+      });
+    }
   };
 
   const addOption = () => {

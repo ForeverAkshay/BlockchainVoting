@@ -12,19 +12,34 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
-
-  await throwIfResNotOk(res);
-  return res;
+  try {
+    console.log(`API Request: ${method} ${url}`, data);
+    
+    const res = await fetch(url, {
+      method,
+      headers: data ? { "Content-Type": "application/json" } : {},
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
+    
+    console.log(`API Response status: ${res.status}`, res);
+    
+    // Don't throw here, let the caller handle the response
+    // This allows proper error handling in mutations
+    return res;
+  } catch (error) {
+    console.error("API Request error:", error);
+    throw error;
+  }
 }
 
 export async function apiGet<T>(url: string): Promise<T> {
   const res = await apiRequest("GET", url);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ message: res.statusText }));
+    console.error("API Get error:", errorData);
+    throw new Error(errorData.message || `Request failed with status ${res.status}`);
+  }
   return await res.json() as T;
 }
 
