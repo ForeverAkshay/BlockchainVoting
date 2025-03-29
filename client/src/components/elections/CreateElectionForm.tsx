@@ -1,31 +1,30 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createElectionSchema } from "@shared/schema";
+import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useWeb3 } from "@/lib/web3";
 import { getVotingContract } from "@/lib/web3";
-import { ethers } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage} from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import TransactionModal from "../modals/TransactionModal";
 import { useWebSocket } from "@/lib/websocket";
 
-// Utility function to combine date and time strings into a Unix timestamp
-const combineDateTime = (dateStr: string, timeStr: string): number => {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  
-  // Month is 0-indexed in JavaScript Date
-  const date = new Date(year, month - 1, day, hours, minutes);
-  return Math.floor(date.getTime() / 1000); // Return Unix timestamp in seconds
-};
+// Simple schema for form validation
+const formSchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters").max(100),
+  description: z.string().min(10, "Description must be at least 10 characters").max(500),
+  date: z.string().min(1, "Please select a date"),
+  startTime: z.string().min(1, "Please select a start time"),
+  endTime: z.string().min(1, "Please select an end time"),
+  isPublic: z.boolean()
+});
 
 interface CreateElectionFormProps {
   onSuccess: () => void;
@@ -52,76 +51,47 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
   const { sendMessage } = useWebSocket();
 
   const form = useForm({
-    resolver: zodResolver(createElectionSchema),
+    resolver: zodResolver(formSchema),
     defaultValues: {
       title: "",
       description: "",
-      startDate: new Date().toISOString().split("T")[0],
+      date: new Date().toISOString().split("T")[0],
       startTime: "09:00",
       endTime: "17:00",
-      isPublic: true,
-      options: candidates,
-      creatorAddress: address || ""
+      isPublic: true
     }
   });
-  
-  // Update the form when candidates or address changes
-  useEffect(() => {
-    form.setValue('options', candidates);
-  }, [candidates, form]);
-  
-  // Update wallet address when it changes
-  useEffect(() => {
-    if (address) {
-      form.setValue('creatorAddress', address);
-    }
-  }, [address, form]);
 
   const createElectionMutation = useMutation({
     mutationFn: async (data: any) => {
-      console.log("Mutation function called with data:", data);
+      console.log("Creating election with data:", data);
       
-      try {
-        // Log all data for debugging
-        console.log("Submitting to API with data:", JSON.stringify(data));
-        
-        // First create the election in the database
-        const apiResponse = await fetch("/api/elections", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            ...data,
-            creatorAddress: address
-          })
-        });
-        
-        // Check if the response is ok
-        if (!apiResponse.ok) {
-          const errorData = await apiResponse.json();
-          console.error("API error response:", errorData);
-          throw new Error(errorData.message || "Failed to create election");
-        }
-        
-        const responseData = await apiResponse.json();
-        console.log("API response:", responseData);
-        return responseData;
-      } catch (error) {
-        console.error("Mutation error:", error);
-        throw error;
+      // First create the election in the database
+      const response = await fetch("/api/elections", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to create election");
       }
+      
+      return await response.json();
     },
     onSuccess: (data) => {
-      console.log("Mutation success, data:", data);
+      console.log("Election created in database:", data);
       queryClient.invalidateQueries({ queryKey: ["/api/elections"] });
       createBlockchainElection(data);
     },
     onError: (error: any) => {
-      console.error("Mutation error handler:", error);
+      console.error("Failed to create election:", error);
       toast({
-        title: "Failed to create election",
-        description: error.message || "Something went wrong with the request",
+        title: "Election creation failed",
+        description: error.message || "Could not create the election",
         variant: "destructive"
       });
     }
@@ -143,7 +113,7 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
 
       const contract = getVotingContract(signer);
       
-      // Get back to Unix timestamps for the blockchain
+      // Get timestamps for blockchain
       const startTime = Math.floor(new Date(electionData.startDate).getTime() / 1000);
       const endTime = Math.floor(new Date(electionData.endDate).getTime() / 1000);
       const candidateNames = electionData.options.map((option: any) => option.name);
@@ -207,57 +177,39 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
 
   const onSubmit = (data: any) => {
     try {
-      // Validate form data
+      // Validate that all candidates have names
       if (candidates.some(c => !c.name.trim())) {
         toast({
-          title: "Invalid option names",
-          description: "All candidates/options must have a name",
+          title: "Invalid candidate names",
+          description: "All candidates must have names",
           variant: "destructive"
         });
         return;
       }
       
-      // Make sure the data is complete
-      if (!data.title || !data.description || !data.startDate || !data.startTime || !data.endTime) {
-        toast({
-          title: "Missing information",
-          description: "Please fill out all required fields",
-          variant: "destructive"
-        });
-        console.error("Missing required fields:", { data });
-        return;
-      }
+      // Parse date and times
+      const [year, month, day] = data.date.split('-').map(Number);
       
-      // Log form data for debugging
-      console.log("Form submission data:", data);
-      console.log("Candidates state:", candidates);
+      // Start time
+      const [startHour, startMinute] = data.startTime.split(':').map(Number);
+      const startDate = new Date(year, month - 1, day, startHour, startMinute);
       
-      // Create start and end DateTimes using the same date but different times
-      const startDateTime = combineDateTime(data.startDate, data.startTime);
-      const endDateTime = combineDateTime(data.startDate, data.endTime);
+      // End time
+      const [endHour, endMinute] = data.endTime.split(':').map(Number);
+      const endDate = new Date(year, month - 1, day, endHour, endMinute);
       
-      // Validation: Check if date/time combination produced valid results
-      if (startDateTime === 0 || endDateTime === 0) {
-        toast({
-          title: "Invalid date/time format",
-          description: "Please ensure all date and time fields are filled correctly",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Validation: Check if times are valid
-      const now = Math.floor(Date.now() / 1000);
-      if (startDateTime < now) {
+      // Validation
+      const now = new Date();
+      if (startDate <= now) {
         toast({
           title: "Invalid start time",
-          description: "Start time cannot be in the past",
+          description: "Start time must be in the future",
           variant: "destructive"
         });
         return;
       }
       
-      if (endDateTime <= startDateTime) {
+      if (endDate <= startDate) {
         toast({
           title: "Invalid end time",
           description: "End time must be after start time",
@@ -266,15 +218,12 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
         return;
       }
       
-      // Convert Unix timestamps to ISO string format for backend
-      const startDate = new Date(startDateTime * 1000).toISOString();
-      const endDate = new Date(endDateTime * 1000).toISOString();
-      
+      // Prepare submission data
       const formData = {
         title: data.title,
         description: data.description,
-        startDate,
-        endDate,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
         isPublic: data.isPublic,
         options: candidates.map(c => ({
           id: c.id,
@@ -284,15 +233,15 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
         creatorAddress: address || ""
       };
       
-      console.log("Prepared submission data:", formData);
+      console.log("Submitting election data:", formData);
       
-      // Submit the data
+      // Submit to API
       createElectionMutation.mutate(formData);
     } catch (error) {
       console.error("Form submission error:", error);
       toast({
-        title: "Form submission error",
-        description: "Please check the form fields and try again",
+        title: "Error submitting form",
+        description: "Please check your form inputs and try again",
         variant: "destructive"
       });
     }
@@ -359,7 +308,7 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
-                  name="startDate"
+                  name="date"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Election Date</FormLabel>
