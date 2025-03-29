@@ -99,6 +99,27 @@ export default function VotingInterface({ election, isOpen, onClose }: VotingInt
     setTxStatus("pending");
     
     try {
+      // First request explicit permission from MetaMask
+      toast({
+        title: "Wallet authorization required",
+        description: "Please check your MetaMask and approve the connection request",
+      });
+      
+      try {
+        // Request account access if needed
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+      } catch (error) {
+        console.error("User denied account access:", error);
+        setTxStatus("error");
+        toast({
+          title: "Wallet authorization failed",
+          description: "Please approve MetaMask connection to continue with voting",
+          variant: "destructive"
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
       // Get contract with signer to send transactions
       const contract = getVotingContract(signer);
       

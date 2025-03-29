@@ -108,11 +108,22 @@ export function Web3Provider({ children }: { children: ReactNode }): JSX.Element
     setIsConnecting(true);
 
     try {
+      // First, explicitly request permission from MetaMask
+      toast({
+        title: "Wallet authorization required",
+        description: "Please check your MetaMask and approve the connection request",
+      });
+      
+      // Use direct ethereum request for explicit user permission
+      const accounts = await window.ethereum.request({ 
+        method: 'eth_requestAccounts'
+      });
+      
+      if (accounts.length === 0) throw new Error("No accounts found");
+      
+      // Then initialize the provider
       const provider = new ethers.BrowserProvider(window.ethereum);
       setProvider(provider);
-
-      const accounts = await provider.send("eth_requestAccounts", []);
-      if (accounts.length === 0) throw new Error("No accounts found");
 
       const signer = await provider.getSigner();
       const network = await provider.getNetwork();
