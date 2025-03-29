@@ -11,19 +11,20 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage} from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import TransactionModal from "../modals/TransactionModal";
 import { useWebSocket } from "@/lib/websocket";
 
-// Utility function to combine date and time strings into a Date object
-const combineDateTime = (dateStr: string, timeStr: string): Date => {
+// Utility function to combine date and time strings into a Unix timestamp
+const combineDateTime = (dateStr: string, timeStr: string): number => {
   const [year, month, day] = dateStr.split('-').map(Number);
   const [hours, minutes] = timeStr.split(':').map(Number);
   
   // Month is 0-indexed in JavaScript Date
-  return new Date(year, month - 1, day, hours, minutes);
+  const date = new Date(year, month - 1, day, hours, minutes);
+  return Math.floor(date.getTime() / 1000); // Return Unix timestamp in seconds
 };
 
 interface CreateElectionFormProps {
@@ -133,9 +134,9 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
 
       const contract = getVotingContract(signer);
       
-      // Prepare data for the contract
-      const startTime = Math.floor(electionData.startDate.getTime() / 1000);
-      const endTime = Math.floor(electionData.endDate.getTime() / 1000);
+      // Use the Unix timestamps directly
+      const startTime = electionData.startDate;
+      const endTime = electionData.endDate;
       const candidateNames = electionData.options.map((option: any) => option.name);
       const candidateDescriptions = electionData.options.map((option: any) => option.description || "");
       
@@ -214,6 +215,26 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
       // Create start and end DateTimes using the same date but different times
       const startDateTime = combineDateTime(data.startDate, data.startTime);
       const endDateTime = combineDateTime(data.startDate, data.endTime);
+      
+      // Validation: Check if times are valid
+      const now = Math.floor(Date.now() / 1000);
+      if (startDateTime < now) {
+        toast({
+          title: "Invalid start time",
+          description: "Start time cannot be in the past",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      if (endDateTime <= startDateTime) {
+        toast({
+          title: "Invalid end time",
+          description: "End time must be after start time",
+          variant: "destructive"
+        });
+        return;
+      }
       
       const formData = {
         ...data,
@@ -309,6 +330,9 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
                       <FormControl>
                         <Input type="date" {...field} />
                       </FormControl>
+                      <FormDescription className="text-xs">
+                        The date on which this election will be held
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -322,6 +346,9 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
                       <FormControl>
                         <Input type="time" {...field} />
                       </FormControl>
+                      <FormDescription className="text-xs">
+                        The time when voting begins (must be in the future)
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -335,6 +362,9 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
                       <FormControl>
                         <Input type="time" {...field} />
                       </FormControl>
+                      <FormDescription className="text-xs">
+                        The time when voting closes (must be after start time)
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -364,6 +394,9 @@ export default function CreateElectionForm({ onSuccess }: CreateElectionFormProp
                       </div>
                     </RadioGroup>
                   </FormControl>
+                  <FormDescription className="text-xs">
+                    Choose who can vote in this election
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
