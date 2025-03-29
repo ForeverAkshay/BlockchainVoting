@@ -210,6 +210,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const votes = await storage.getVotesByElection(id);
+      
+      // Log votes for debugging
+      console.log(`Votes for election ${id}:`, JSON.stringify(votes, null, 2));
+      
       res.json(votes);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch votes" });
@@ -267,7 +271,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Modify the vote POST handler to broadcast updates when a vote is cast
   apiRouter.post("/votes", async (req, res) => {
     try {
+      console.log("Received vote data:", JSON.stringify(req.body, null, 2));
       const validatedData = insertVoteSchema.parse(req.body);
+      console.log("Validated vote data:", JSON.stringify(validatedData, null, 2));
       
       // Check if the election exists
       const election = await storage.getElection(validatedData.electionId);
@@ -282,13 +288,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const vote = await storage.createVote(validatedData);
+      console.log("Created vote:", JSON.stringify(vote, null, 2));
       res.status(201).json(vote);
       
       // Broadcast vote update to all connected clients
       const updateMessage = JSON.stringify({
         type: 'vote',
         electionId: validatedData.electionId,
-        transactionHash: validatedData.transactionHash
+        candidateId: validatedData.optionId, // Include the candidateId in the message
+        transactionHash: validatedData.transactionHash,
+        message: `Vote cast for candidate "${election.options[validatedData.optionId === 0 ? 0 : validatedData.optionId-1]?.name || 'Unknown'}" in election "${election.title}"`
       });
       
       clients.forEach(client => {

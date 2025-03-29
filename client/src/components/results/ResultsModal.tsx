@@ -52,7 +52,15 @@ export default function ResultsModal({ election, isOpen, onClose }: ResultsModal
         
         // Count actual votes
         votes.forEach((vote: any) => {
-          const optionId = vote.optionId;
+          // Handle both 0-based and 1-based indexing
+          // If optionId is 0, map it to the first option (ID 1)
+          // This is needed because blockchain might use 0-based indexing while our database uses 1-based indexing
+          const optionId = typeof vote.optionId === 'number' && vote.optionId === 0 
+            ? 1 // Map first option (from blockchain index 0) to ID 1
+            : vote.optionId;
+            
+          console.log("Processing vote with optionId:", vote.optionId, "mapped to:", optionId);
+          
           const currentCount = voteCounts.get(optionId) || 0;
           voteCounts.set(optionId, currentCount + 1);
         });
