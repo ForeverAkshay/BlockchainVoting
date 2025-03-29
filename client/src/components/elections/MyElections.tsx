@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { apiRequest, apiGet } from "@/lib/queryClient";
 import { useWeb3 } from "@/lib/web3";
 import { useToast } from "@/hooks/use-toast";
@@ -9,15 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-import ResultsModal from "../results/ResultsModal";
-
 export default function MyElections() {
   const { address, isConnected } = useWeb3();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [_, setLocation] = useLocation();
   const [selectedElection, setSelectedElection] = useState<Election | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
-  const [showResults, setShowResults] = useState(false);
 
   const { data: elections, isLoading } = useQuery({
     queryKey: [`/api/elections/creator/${address}`],
@@ -50,8 +49,7 @@ export default function MyElections() {
   });
 
   const handleViewResults = (election: Election) => {
-    setSelectedElection(election);
-    setShowResults(true);
+    setLocation(`/results?id=${election.id}`);
   };
 
   const handleDeleteClick = (election: Election) => {
@@ -279,14 +277,7 @@ export default function MyElections() {
         </DialogContent>
       </Dialog>
 
-      {/* Results Modal */}
-      {selectedElection && (
-        <ResultsModal
-          election={selectedElection}
-          isOpen={showResults}
-          onClose={() => setShowResults(false)}
-        />
-      )}
+
     </>
   );
 }

@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Election } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { apiGet } from "@/lib/queryClient";
-import ResultsModal from "@/components/results/ResultsModal";
 import VotingInterface from "@/components/voting/VotingInterface";
 import { useWebSocket } from "@/lib/websocket";
 import { useToast } from "@/hooks/use-toast";
@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function ElectionList() {
   const [selectedElection, setSelectedElection] = useState<Election | null>(null);
   const [isVotingModalOpen, setIsVotingModalOpen] = useState(false);
-  const [isResultsModalOpen, setIsResultsModalOpen] = useState(false);
+  const [_, setLocation] = useLocation();
   const { lastMessage, connected } = useWebSocket();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -77,10 +77,9 @@ export default function ElectionList() {
     setIsVotingModalOpen(true);
   };
   
-  // Handle results modal
+  // Handle results page navigation
   const handleViewResults = (election: Election) => {
-    setSelectedElection(election);
-    setIsResultsModalOpen(true);
+    setLocation(`/results?id=${election.id}`);
   };
   
   // Function to determine if an election is active
@@ -228,19 +227,11 @@ export default function ElectionList() {
       
       {/* Modals */}
       {selectedElection && (
-        <>
-          <VotingInterface
-            election={selectedElection}
-            isOpen={isVotingModalOpen}
-            onClose={() => setIsVotingModalOpen(false)}
-          />
-          
-          <ResultsModal
-            election={selectedElection}
-            isOpen={isResultsModalOpen}
-            onClose={() => setIsResultsModalOpen(false)}
-          />
-        </>
+        <VotingInterface
+          election={selectedElection}
+          isOpen={isVotingModalOpen}
+          onClose={() => setIsVotingModalOpen(false)}
+        />
       )}
     </div>
   );

@@ -8,6 +8,7 @@ import Dashboard from "@/pages/dashboard";
 import Welcome from "@/pages/welcome";
 import VoterPage from "@/pages/voter";
 import AdminPage from "@/pages/admin";
+import ResultsPage from "@/pages/results";
 import { Web3Provider } from "./lib/web3";
 import { WebSocketProvider } from "./lib/websocket";
 
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/voter" component={VoterPage} />
       <Route path="/admin" component={AdminPage} />
+      <Route path="/results" component={ResultsPage} />
       <Route component={NotFound} />
     </Switch>
   );
