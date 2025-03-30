@@ -58,19 +58,28 @@ export default function ResultsPage() {
         const voteCounts = new Map<number, number>();
         
         // Initialize all options with 0 votes
-        electionData.options.forEach((option: any) => {
-          voteCounts.set(option.id, 0);
+        electionData.options.forEach((option: any, index: number) => {
+          // Use index to match the 0-based indexing used in VotingInterface
+          voteCounts.set(index, 0);
         });
+        
+        console.log("Vote data from API:", JSON.stringify(votes, null, 2));
         
         // Count actual votes
         votes.forEach((vote: any) => {
-          // Handle both 0-based and 1-based indexing
-          const optionId = typeof vote.optionId === 'number' && vote.optionId === 0 
-            ? 1 // Map first option (from blockchain index 0) to ID 1
-            : vote.optionId;
+          // Use the optionId directly from the vote record
+          // We're now consistently using 0-based indexing across the application
+          const optionId = vote.optionId;
           
-          const currentCount = voteCounts.get(optionId) || 0;
-          voteCounts.set(optionId, currentCount + 1);
+          console.log(`Processing vote with optionId: ${optionId}`);
+          
+          // Ensure the optionId is valid
+          if (optionId !== undefined && optionId >= 0 && optionId < electionData.options.length) {
+            const currentCount = voteCounts.get(optionId) || 0;
+            voteCounts.set(optionId, currentCount + 1);
+          } else {
+            console.error(`Invalid optionId ${optionId} in vote:`, vote);
+          }
         });
         
         // Create results with actual vote counts
@@ -78,7 +87,7 @@ export default function ResultsPage() {
           id: option.id || index,
           name: option.name,
           description: option.description,
-          voteCount: voteCounts.get(option.id) || 0,
+          voteCount: voteCounts.get(index) || 0, // Use index (0-based) to match vote records
           percentage: 0 // Will be calculated below
         }));
         

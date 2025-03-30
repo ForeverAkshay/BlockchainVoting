@@ -295,9 +295,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateMessage = JSON.stringify({
         type: 'vote',
         electionId: validatedData.electionId,
-        candidateId: validatedData.optionId, // Include the candidateId in the message
+        candidateId: validatedData.optionId, // Use the same 0-based index for consistency
         transactionHash: validatedData.transactionHash,
-        message: `Vote cast for candidate "${election.options[validatedData.optionId === 0 ? 0 : validatedData.optionId-1]?.name || 'Unknown'}" in election "${election.title}"`
+        message: `Vote cast for candidate "${election.options[validatedData.optionId]?.name || 'Unknown'}" in election "${election.title}"`
       });
       
       clients.forEach(client => {

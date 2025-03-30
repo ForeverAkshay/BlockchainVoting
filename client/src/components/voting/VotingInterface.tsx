@@ -138,6 +138,9 @@ export default function VotingInterface({ election, isOpen, onClose }: VotingInt
         return;
       }
       
+      // Log to help with debugging
+      console.log(`Submitting vote for election ID ${election.id}, candidate index ${selectedCandidate}, candidate name: ${election.options[selectedCandidate].name}`);
+      
       // Send transaction to vote
       const tx = await contract.vote(election.id, selectedCandidate);
       setTxHash(tx.hash);
@@ -149,15 +152,15 @@ export default function VotingInterface({ election, isOpen, onClose }: VotingInt
         // Transaction successful
         setTxStatus("success");
         
-        // Record vote in the database
+        // Record vote in the database - make sure optionId matches the smart contract candidateId
         await apiRequest("POST", "/api/votes", {
           electionId: election.id,
           voterAddress: address,
-          optionId: selectedCandidate, // Changed from candidateId to optionId to match schema
+          optionId: selectedCandidate, // This is the 0-based index which matches the smart contract
           transactionHash: tx.hash
         });
         
-        // Send WebSocket notification about the vote
+        // Send WebSocket notification about the vote with the correct candidate name
         sendMessage({
           type: 'vote',
           electionId: election.id,
@@ -225,10 +228,18 @@ export default function VotingInterface({ election, isOpen, onClose }: VotingInt
                 <RadioGroup value={selectedCandidate?.toString()} onValueChange={(val) => setSelectedCandidate(parseInt(val))}>
                   <div className="space-y-3">
                     {election.options.map((option, index) => (
-                      <Card key={option.id || index} className={selectedCandidate === index ? "border-primary" : ""}>
+                      <Card 
+                        key={option.id || index} 
+                        className={selectedCandidate === index ? "border-primary" : ""}
+                      >
                         <CardContent className="p-3">
                           <div className="flex items-start space-x-3">
-                            <RadioGroupItem value={index.toString()} id={`candidate-${index}`} className="mt-1" />
+                            {/* Use consistent index value for selection */}
+                            <RadioGroupItem 
+                              value={index.toString()} 
+                              id={`candidate-${index}`} 
+                              className="mt-1" 
+                            />
                             <div className="grid gap-1.5">
                               <Label htmlFor={`candidate-${index}`} className="font-medium">
                                 {option.name}
